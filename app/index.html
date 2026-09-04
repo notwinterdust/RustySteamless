@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rusty-Steamless</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Rusty-Steamless</h1>
+        <p class="subtitle">SteamStub DRM remover</p>
+      </header>
+
+      <section class="card" id="file-card">
+        <button id="pick" type="button">Select file…</button>
+        <span id="path" class="muted">No file selected</span>
+        <small class="drop-hint">or drop a packed executable here</small>
+      </section>
+
+      <section class="card" id="options-card">
+        <h2>Options</h2>
+        <label><input type="checkbox" id="opt-verbose" checked /> Verbose output</label>
+        <label><input type="checkbox" id="opt-keepbind" /> Keep .bind section</label>
+        <label><input type="checkbox" id="opt-keepstub" /> Keep DOS stub data</label>
+        <label><input type="checkbox" id="opt-dumppayload" /> Dump payload</label>
+        <label><input type="checkbox" id="opt-dumpdrmp" /> Dump SteamDRMP.dll</label>
+        <label><input type="checkbox" id="opt-realign" /> Re-align sections</label>
+        <label><input type="checkbox" id="opt-checksum" /> Recalculate checksum</label>
+        <label><input type="checkbox" id="opt-exp" /> Experimental features</label>
+      </section>
+
+      <section class="card" id="actions-card">
+        <button id="unpack" type="button" disabled>Unpack</button>
+        <span id="dispatch" class="muted"></span>
+        <span id="status" class="muted"></span>
+      </section>
+
+      <section class="card" id="log-card">
+        <h2>Console</h2>
+        <pre id="console" aria-live="polite"></pre>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
