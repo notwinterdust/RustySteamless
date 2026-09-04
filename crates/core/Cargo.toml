@@ -1,5 +1,5 @@
 [package]
-name = "rusty-steamless-core"
+name = "rusty-core"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,7 +8,7 @@ repository.workspace = true
 description = "Core library for Rusty-Steamless: SteamStub DRM unpacking."
 
 [lib]
-name = "rusty_steamless_core"
+name = "rusty_core"
 path = "src/lib.rs"
 
 [dependencies]
@@ -18,3 +18,4 @@ cipher.workspace = true
 iced-x86.workspace = true
 serde.workspace = true
 anyhow.workspace = true
+thiserror.workspace = true

@@ -17,3 +17,4 @@ aes = "0.8"
 cbc = { version = "0.1", features = ["alloc"] }
 cipher = "0.4"
 iced-x86 = "1.21"
+thiserror = "2"

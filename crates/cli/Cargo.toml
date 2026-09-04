@@ -1,5 +1,5 @@
 [package]
-name = "rusty-steamless"
+name = "rusty-cli"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,6 +12,6 @@ name = "rusty-steamless"
 path = "src/main.rs"
 
 [dependencies]
-rusty-steamless-core = { path = "../core" }
+rusty-core = { path = "../core" }
 clap.workspace = true
 anyhow.workspace = true
