@@ -1,0 +1,1 @@
+//! Crypto helpers: AES, XTEA and the SteamStub XOR stream.
