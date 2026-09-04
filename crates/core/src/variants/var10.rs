@@ -114,3 +114,113 @@ impl Variant10 {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::logger::NullLogger;
+    use crate::pe::Buf;
+    use crate::variants::Unpacker;
+
+    const IMAGE_BASE: u32 = 0x400000;
+    const EP_RVA: u32 = 0x1000;
+    const BIND_VA: u32 = 0x2000;
+    const HEADER_RAW: u32 = 0xB00;
+    const HEADER_SIZE: usize = 0x6A * 4;
+
+    /// Assembles a minimal x86 PE32 carrying a synthetic SteamStub v1.0 stub.
+    ///
+    /// `.bind` holds the unpacker code patterns; the XOR-obfuscated header sits
+    /// in the trailing bytes (`raw offset == RVA`, outside every section), which
+    /// mirrors how `GetFileOffsetFromRva` resolves header pointers in real files.
+    fn build_v10_pe() -> Vec<u8> {
+        let text_raw = 0x300u32;
+        let bind_raw = 0x500u32;
+        let bind_size = 0x600u32;
+
+        let mut bind = vec![0u8; bind_size as usize];
+        // v1.0 bind unpacker header pattern (offset 0), header pointer VA and
+        // the size byte that the stub multiplies by four.
+        bind[0..8].copy_from_slice(&[0x60, 0x81, 0xEC, 0x00, 0x10, 0x00, 0x00, 0xBE]);
+        bind.wr_u32(8, IMAGE_BASE + HEADER_RAW);
+        bind[12..14].copy_from_slice(&[0xB9, 0x6A]);
+
+        // SteamStub header plaintext, obfuscated with the `b ^= (x*x) as u8`
+        // scheme, where BindFunction must equal image base + entry point.
+        let mut plain = vec![0u8; HEADER_SIZE];
+        plain.wr_u32(8, IMAGE_BASE + EP_RVA);
+
+        // OEP pattern near the end of the bind section (outside the header).
+        let oep_va = IMAGE_BASE + 0x1234;
+        bind[0x200..0x202].copy_from_slice(&[0x61, 0xB8]);
+        bind.wr_u32(0x202, oep_va);
+        bind[0x206..0x208].copy_from_slice(&[0xFF, 0xE0]);
+
+        let mut file = vec![0u8; (HEADER_RAW as usize) + HEADER_SIZE];
+        // DOS header.
+        file[0] = b'M';
+        file[1] = b'Z';
+        file.wr_u32(0x3C, 0x100); // e_lfanew
+                                  // NT headers.
+        file[0x100..0x104].copy_from_slice(b"PE\0\0");
+        file.wr_u16(0x104, 0x014C); // IMAGE_FILE_MACHINE_I386
+        file.wr_u16(0x106, 2); // number of sections
+        file.wr_u16(0x114, 0xE0); // size of optional header
+                                  // Optional header (PE32).
+        file.wr_u16(0x118, 0x10B); // PE32 magic
+        file.wr_u32(0x128, EP_RVA); // address of entry point
+        file.wr_u32(0x12C, EP_RVA); // base of code
+        file.wr_u64(0x134, IMAGE_BASE as u64);
+        file.wr_u32(0x138, 0x1000); // section alignment
+        file.wr_u32(0x13C, 0x200); // file alignment
+        file.wr_u32(0x150, 0x3000); // size of image
+        file.wr_u32(0x154, 0x300); // size of headers
+
+        let sections = 0x118 + 0xE0;
+        // ".text"
+        file[sections..sections + 8].copy_from_slice(b".text\0\0\0");
+        file.wr_u32(sections + 12, EP_RVA); // virtual address
+        file.wr_u32(sections + 16, 0x200); // size of raw data
+        file.wr_u32(sections + 20, text_raw); // pointer to raw data
+                                              // ".bind"
+        file[sections + 40..sections + 48].copy_from_slice(b".bind\0\0\0");
+        file.wr_u32(sections + 52, BIND_VA);
+        file.wr_u32(sections + 56, bind_size);
+        file.wr_u32(sections + 60, bind_raw);
+
+        file[text_raw as usize..(text_raw + 0x200) as usize].fill(0x90);
+        file[bind_raw as usize..(bind_raw + bind_size) as usize].copy_from_slice(&bind);
+        let obfuscated: Vec<u8> = plain
+            .iter()
+            .enumerate()
+            .map(|(i, byte)| *byte ^ ((i * i) as u8))
+            .collect();
+        file[HEADER_RAW as usize..(HEADER_RAW as usize) + HEADER_SIZE].copy_from_slice(&obfuscated);
+        file
+    }
+
+    #[test]
+    fn v10_round_trips_synthetic_packed_pe() {
+        let temp = std::env::temp_dir();
+        let input = temp.join(format!("rusty_v10_{}.exe", std::process::id()));
+        let output = temp.join(format!("rusty_v10_{}.exe.unpacked.exe", std::process::id()));
+
+        std::fs::write(&input, build_v10_pe()).unwrap();
+        let mut pe = PeFile::from_bytes(std::fs::read(&input).unwrap(), input.clone()).unwrap();
+
+        let unpacker = Variant10;
+        assert!(unpacker.can_process(&pe), "synthetic file must be v1.0");
+        unpacker
+            .process(&mut pe, &Options::default(), &NullLogger)
+            .unwrap();
+
+        let unpacked = std::fs::read(&output).unwrap();
+        // Entry point rewritten to the original entry point.
+        assert_eq!(unpacked.rd_u32(0x128), Some(0x1234));
+        // .bind section removed.
+        assert_eq!(unpacked.rd_u16(0x106), Some(1));
+
+        let _ = std::fs::remove_file(input);
+        let _ = std::fs::remove_file(output);
+    }
+}
