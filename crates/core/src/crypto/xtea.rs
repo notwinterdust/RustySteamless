@@ -33,7 +33,8 @@ pub fn steam_drmp_pass2(res: &mut [u32; 2], keys: &[u32], mut v1: u32, mut v2: u
 
     for _ in 0..n {
         v2 = v2.wrapping_sub(
-            ((v1 << 4 ^ v1 >> 5).wrapping_add(v1)) ^ (sum.wrapping_add(keys[(sum >> 11 & 3) as usize])),
+            ((v1 << 4 ^ v1 >> 5).wrapping_add(v1))
+                ^ (sum.wrapping_add(keys[(sum >> 11 & 3) as usize])),
         );
         sum = sum.wrapping_sub(DELTA);
         v1 = v1.wrapping_sub(
@@ -78,7 +79,10 @@ mod tests {
         let orig = data;
         // First call derives the key from the first dword and returns the last.
         let key = steam_xor(&mut data, 8, 0);
-        assert_eq!(key, u32::from_le_bytes([orig[4], orig[5], orig[6], orig[7]]));
+        assert_eq!(
+            key,
+            u32::from_le_bytes([orig[4], orig[5], orig[6], orig[7]])
+        );
         // The first dword remains the plaintext key source for the second pass.
         assert_eq!(data[0..4], orig[0..4]);
         // Second pass restores the original stream.

@@ -73,10 +73,8 @@ pub fn update_checksum_in_buffer(data: &mut [u8]) -> Option<u32> {
 /// Updates the checksum of a PE file on disk via a temp buffer, in place on the file.
 pub fn update_checksum(path: &std::path::Path) -> std::io::Result<u32> {
     let mut data = std::fs::read(path)?;
-    let sum = update_checksum_in_buffer(&mut data).ok_or_else(|| std::io::Error::new(
-        std::io::ErrorKind::InvalidData,
-        "not a PE image",
-    ))?;
+    let sum = update_checksum_in_buffer(&mut data)
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "not a PE image"))?;
     std::fs::write(path, data)?;
     Ok(sum)
 }

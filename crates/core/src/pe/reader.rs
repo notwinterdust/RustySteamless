@@ -70,7 +70,7 @@ pub fn align_up(value: u64, align: u64) -> u64 {
     if align == 0 {
         return value;
     }
-    ((value + align - 1) / align) * align
+    value.div_ceil(align) * align
 }
 
 /// Reads a null-terminated section name buffer (8 bytes) into a string.
@@ -98,7 +98,7 @@ mod tests {
 
     #[test]
     fn writes_le_values_in_place() {
-        let mut data = vec![0u8; 8];
+        let mut data = [0u8; 8];
         data.wr_u16(0, 0x5a4d);
         data.wr_u32(2, 0x12345678);
         data.wr_u64(0, 0);

@@ -6,9 +6,11 @@
 use thiserror::Error;
 
 pub mod crypto;
+pub mod logger;
 pub mod options;
 pub mod pattern;
 pub mod pe;
+pub mod variants;
 
 /// Convenience result type used across the crate.
 pub type Result<T> = std::result::Result<T, Error>;

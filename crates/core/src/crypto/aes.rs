@@ -4,8 +4,8 @@
 //! section), always with no padding.
 
 use aes::Aes256;
-use cipher::{BlockDecrypt, KeyInit};
 use cipher::generic_array::GenericArray;
+use cipher::{BlockDecrypt, KeyInit};
 
 /// Incomplete blocks must only be handled by the caller; this is the block size.
 pub const BLOCK_SIZE: usize = 16;

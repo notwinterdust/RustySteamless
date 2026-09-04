@@ -5,9 +5,9 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::{Error, Result};
-use super::reader::Buf;
 use super::reader;
+use super::reader::Buf;
+use crate::{Error, Result};
 
 /// The 32-bit and 64-bit optional header magics.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -231,8 +231,20 @@ impl TlsDirectory {
             end_address_of_raw_data: r2,
             address_of_index: r3,
             address_of_callbacks: r4,
-            size_of_zero_fill: data.rd_u32(off + if matches!(bits, ImageBits::Pe32) { 16 } else { 32 })?,
-            characteristics: data.rd_u32(off + if matches!(bits, ImageBits::Pe32) { 20 } else { 36 })?,
+            size_of_zero_fill: data.rd_u32(
+                off + if matches!(bits, ImageBits::Pe32) {
+                    16
+                } else {
+                    32
+                },
+            )?,
+            characteristics: data.rd_u32(
+                off + if matches!(bits, ImageBits::Pe32) {
+                    20
+                } else {
+                    36
+                },
+            )?,
         })
     }
 }
@@ -281,7 +293,8 @@ impl PeFile {
     /// Parses PE data that has already been loaded into memory.
     pub fn from_bytes(data: Vec<u8>, path: PathBuf) -> Result<Self> {
         // DOS header.
-        let dos_header = DosHeader::parse(&data).ok_or_else(|| Error::InvalidPe("truncated DOS header".into()))?;
+        let dos_header = DosHeader::parse(&data)
+            .ok_or_else(|| Error::InvalidPe("truncated DOS header".into()))?;
         if !dos_header.is_valid() {
             return Err(Error::InvalidPe("missing MZ magic".into()));
         }
@@ -313,15 +326,18 @@ impl PeFile {
 
         // Optional header.
         let oh_off = fh_off + FileHeader::SIZE;
-        let optional = parse_optional_header(&data, oh_off, file_header.size_of_optional_header as usize)
-            .ok_or_else(|| Error::InvalidPe("invalid optional header".into()))?;
+        let optional =
+            parse_optional_header(&data, oh_off, file_header.size_of_optional_header as usize)
+                .ok_or_else(|| Error::InvalidPe("invalid optional header".into()))?;
         let bits = optional.bits();
 
         // DOS stub (data between the DOS header and the NT headers).
         let dos_stub_offset = DosHeader::SIZE;
         let dos_stub_size = nt_headers_offset.saturating_sub(DosHeader::SIZE);
         let dos_stub = if dos_stub_size > 0 {
-            data.rd_bytes(dos_stub_offset, dos_stub_size).unwrap_or(&[]).to_vec()
+            data.rd_bytes(dos_stub_offset, dos_stub_size)
+                .unwrap_or(&[])
+                .to_vec()
         } else {
             Vec::new()
         };
@@ -336,7 +352,8 @@ impl PeFile {
                 return Err(Error::InvalidPe("truncated section header".into()));
             };
             let raw_len = sec.size_of_raw_data as usize;
-            let aligned_len = reader::align_up(raw_len as u64, optional.file_alignment as u64) as usize;
+            let aligned_len =
+                reader::align_up(raw_len as u64, optional.file_alignment as u64) as usize;
             let raw = data
                 .rd_bytes(sec.pointer_to_raw_data as usize, raw_len)
                 .unwrap_or_default()
@@ -348,7 +365,7 @@ impl PeFile {
         }
 
         // Overlay data.
-        let overlay = sections.last().map_or(true, |s| {
+        let overlay = sections.last().is_none_or(|s| {
             (s.pointer_to_raw_data as u64 + s.size_of_raw_data as u64) < data.len() as u64
         });
         let overlay = if overlay && !sections.is_empty() {
@@ -400,7 +417,9 @@ impl PeFile {
 
     /// Whether the file contains a section with the given name.
     pub fn has_section(&self, name: &str) -> bool {
-        self.sections.iter().any(|s| s.name_str().eq_ignore_ascii_case(name))
+        self.sections
+            .iter()
+            .any(|s| s.name_str().eq_ignore_ascii_case(name))
     }
 
     /// Returns the section with the given name, if present.
@@ -413,14 +432,19 @@ impl PeFile {
     /// Returns the section that owns `rva`, if any.
     pub fn get_section_index_by_rva(&self, rva: u64) -> Option<usize> {
         self.sections.iter().position(|s| {
-            let size = if s.virtual_size == 0 { s.size_of_raw_data as u64 } else { s.virtual_size as u64 };
+            let size = if s.virtual_size == 0 {
+                s.size_of_raw_data as u64
+            } else {
+                s.virtual_size as u64
+            };
             rva >= s.virtual_address as u64 && rva < s.virtual_address as u64 + size
         })
     }
 
     /// Returns the owner section of `rva`.
     pub fn get_owner_section(&self, rva: u64) -> Option<&SectionHeader> {
-        self.get_section_index_by_rva(rva).map(|i| &self.sections[i])
+        self.get_section_index_by_rva(rva)
+            .map(|i| &self.sections[i])
     }
 
     /// Returns a section's data by index.
@@ -430,7 +454,8 @@ impl PeFile {
 
     /// Returns a section's data by name.
     pub fn get_section_data_by_name(&self, name: &str) -> Option<&[u8]> {
-        self.get_section_index(name).and_then(|i| self.get_section_data(i))
+        self.get_section_index(name)
+            .and_then(|i| self.get_section_data(i))
     }
 
     /// Returns the index of a section by name.
@@ -459,10 +484,22 @@ impl PeFile {
     pub fn rebuild_sections(&mut self, realign: bool) {
         if realign {
             for section in &mut self.sections {
-                section.virtual_address = reader::align_up(section.virtual_address as u64, self.optional.section_alignment as u64) as u32;
-                section.virtual_size = reader::align_up(section.virtual_size as u64, self.optional.section_alignment as u64) as u32;
-                section.pointer_to_raw_data = reader::align_up(section.pointer_to_raw_data as u64, self.optional.file_alignment as u64) as u32;
-                section.size_of_raw_data = reader::align_up(section.size_of_raw_data as u64, self.optional.file_alignment as u64) as u32;
+                section.virtual_address = reader::align_up(
+                    section.virtual_address as u64,
+                    self.optional.section_alignment as u64,
+                ) as u32;
+                section.virtual_size = reader::align_up(
+                    section.virtual_size as u64,
+                    self.optional.section_alignment as u64,
+                ) as u32;
+                section.pointer_to_raw_data = reader::align_up(
+                    section.pointer_to_raw_data as u64,
+                    self.optional.file_alignment as u64,
+                ) as u32;
+                section.size_of_raw_data = reader::align_up(
+                    section.size_of_raw_data as u64,
+                    self.optional.file_alignment as u64,
+                ) as u32;
             }
         }
         if let Some(last) = self.sections.last() {
@@ -495,7 +532,8 @@ impl PeFile {
     /// then the overlay trailing the file.
     pub fn save_unpacked(&self, target: &std::path::Path, params: &SaveParameters) -> Result<()> {
         let nt_off = self.nt_headers_offset;
-        let sections_start = nt_off + 4 + FileHeader::SIZE + self.file_header.size_of_optional_header as usize;
+        let sections_start =
+            nt_off + 4 + FileHeader::SIZE + self.file_header.size_of_optional_header as usize;
 
         fn write_at(buf: &mut Vec<u8>, off: usize, bytes: &[u8]) {
             let end = off.saturating_add(bytes.len());
@@ -556,10 +594,18 @@ fn parse_optional_header(data: &[u8], off: usize, size: usize) -> Option<Optiona
         _ => return None,
     };
 
-    let image_base = if pe32 { data.rd_u32(off + 28)? as u64 } else { data.rd_u64(off + 24)? };
+    let image_base = if pe32 {
+        data.rd_u32(off + 28)? as u64
+    } else {
+        data.rd_u64(off + 24)?
+    };
     let directories_off = if pe32 { 96 } else { 112 };
     let mut directories = [DataDirectory::default(); 16];
-    let directory_count = if size >= directories_off + 16 * 8 { 16 } else { (size.saturating_sub(directories_off)) / 8 };
+    let directory_count = if size >= directories_off + 16 * 8 {
+        16
+    } else {
+        (size.saturating_sub(directories_off)) / 8
+    };
     for (i, dir) in directories.iter_mut().enumerate().take(directory_count) {
         let d = directories_off + i * 8;
         *dir = DataDirectory {
@@ -578,24 +624,40 @@ fn parse_optional_header(data: &[u8], off: usize, size: usize) -> Option<Optiona
         address_of_entry_point: data.rd_u32(off + 16)?,
         base_of_code: data.rd_u32(off + 20)?,
         image_base,
-        section_alignment: data.rd_u32(off + if pe32 { 32 } else { 32 })?,
-        file_alignment: data.rd_u32(off + if pe32 { 36 } else { 36 })?,
-        major_operating_system_version: data.rd_u16(off + if pe32 { 40 } else { 40 })?,
-        minor_operating_system_version: data.rd_u16(off + if pe32 { 42 } else { 42 })?,
-        major_image_version: data.rd_u16(off + if pe32 { 44 } else { 44 })?,
-        minor_image_version: data.rd_u16(off + if pe32 { 46 } else { 46 })?,
-        major_subsystem_version: data.rd_u16(off + if pe32 { 48 } else { 48 })?,
-        minor_subsystem_version: data.rd_u16(off + if pe32 { 50 } else { 50 })?,
-        win32_version_value: data.rd_u32(off + if pe32 { 52 } else { 52 })?,
-        size_of_image: data.rd_u32(off + if pe32 { 56 } else { 56 })?,
-        size_of_headers: data.rd_u32(off + if pe32 { 60 } else { 60 })?,
-        checksum: data.rd_u32(off + if pe32 { 64 } else { 64 })?,
-        subsystem: data.rd_u16(off + if pe32 { 68 } else { 68 })?,
-        dll_characteristics: data.rd_u16(off + if pe32 { 70 } else { 70 })?,
-        size_of_stack_reserve: if pe32 { data.rd_u32(off + 72)? as u64 } else { data.rd_u64(off + 72)? },
-        size_of_stack_commit: if pe32 { data.rd_u32(off + 76)? as u64 } else { data.rd_u64(off + 80)? },
-        size_of_heap_reserve: if pe32 { data.rd_u32(off + 80)? as u64 } else { data.rd_u64(off + 88)? },
-        size_of_heap_commit: if pe32 { data.rd_u32(off + 84)? as u64 } else { data.rd_u64(off + 96)? },
+        section_alignment: data.rd_u32(off + 32)?,
+        file_alignment: data.rd_u32(off + 36)?,
+        major_operating_system_version: data.rd_u16(off + 40)?,
+        minor_operating_system_version: data.rd_u16(off + 42)?,
+        major_image_version: data.rd_u16(off + 44)?,
+        minor_image_version: data.rd_u16(off + 46)?,
+        major_subsystem_version: data.rd_u16(off + 48)?,
+        minor_subsystem_version: data.rd_u16(off + 50)?,
+        win32_version_value: data.rd_u32(off + 52)?,
+        size_of_image: data.rd_u32(off + 56)?,
+        size_of_headers: data.rd_u32(off + 60)?,
+        checksum: data.rd_u32(off + 64)?,
+        subsystem: data.rd_u16(off + 68)?,
+        dll_characteristics: data.rd_u16(off + 70)?,
+        size_of_stack_reserve: if pe32 {
+            data.rd_u32(off + 72)? as u64
+        } else {
+            data.rd_u64(off + 72)?
+        },
+        size_of_stack_commit: if pe32 {
+            data.rd_u32(off + 76)? as u64
+        } else {
+            data.rd_u64(off + 80)?
+        },
+        size_of_heap_reserve: if pe32 {
+            data.rd_u32(off + 80)? as u64
+        } else {
+            data.rd_u64(off + 88)?
+        },
+        size_of_heap_commit: if pe32 {
+            data.rd_u32(off + 84)? as u64
+        } else {
+            data.rd_u64(off + 96)?
+        },
         loader_flags: data.rd_u32(off + if pe32 { 88 } else { 104 })?,
         number_of_rva_and_sizes: data.rd_u32(off + if pe32 { 92 } else { 108 })?,
         directories,
@@ -616,15 +678,21 @@ fn read_tls(
     // Resolve TLS directory file offset.
     let tls_rva = tls.virtual_address as u64;
     let owner = sections.iter().find(|s| {
-        let size = if s.virtual_size == 0 { s.size_of_raw_data as u64 } else { s.virtual_size as u64 };
+        let size = if s.virtual_size == 0 {
+            s.size_of_raw_data as u64
+        } else {
+            s.virtual_size as u64
+        };
         tls_rva >= s.virtual_address as u64 && tls_rva < s.virtual_address as u64 + size
     });
     let Some(owner) = owner else {
         return Ok(None);
     };
-    let file_off = (tls_rva - (owner.virtual_address as u64 - owner.pointer_to_raw_data as u64)) as usize;
+    let file_off =
+        (tls_rva - (owner.virtual_address as u64 - owner.pointer_to_raw_data as u64)) as usize;
 
-    let directory = TlsDirectory::parse(data, file_off, bits).ok_or_else(|| Error::InvalidPe("truncated TLS directory".into()))?;
+    let directory = TlsDirectory::parse(data, file_off, bits)
+        .ok_or_else(|| Error::InvalidPe("truncated TLS directory".into()))?;
     if directory.address_of_callbacks == 0 {
         return Ok(Some((directory, Vec::new())));
     }
@@ -643,8 +711,13 @@ fn read_tls(
     let mut cursor = callbacks_off;
     loop {
         let value = match ptr_size {
-            4 => data.rd_u32(cursor).ok_or_else(|| Error::InvalidPe("TLS callback list truncated".into()))? as u64,
-            _ => data.rd_u64(cursor).ok_or_else(|| Error::InvalidPe("TLS callback list truncated".into()))?,
+            4 => data
+                .rd_u32(cursor)
+                .ok_or_else(|| Error::InvalidPe("TLS callback list truncated".into()))?
+                as u64,
+            _ => data
+                .rd_u64(cursor)
+                .ok_or_else(|| Error::InvalidPe("TLS callback list truncated".into()))?,
         };
         if value == 0 {
             break;
@@ -657,10 +730,17 @@ fn read_tls(
 }
 
 fn callbacks_rva_to_file_offset(rva: u64, sections: &[SectionHeader]) -> Option<usize> {
-    sections.iter().find(|s| {
-        let size = if s.virtual_size == 0 { s.size_of_raw_data as u64 } else { s.virtual_size as u64 };
-        rva >= s.virtual_address as u64 && rva < s.virtual_address as u64 + size
-    }).map(|s| (rva - (s.virtual_address as u64 - s.pointer_to_raw_data as u64)) as usize)
+    sections
+        .iter()
+        .find(|s| {
+            let size = if s.virtual_size == 0 {
+                s.size_of_raw_data as u64
+            } else {
+                s.virtual_size as u64
+            };
+            rva >= s.virtual_address as u64 && rva < s.virtual_address as u64 + size
+        })
+        .map(|s| (rva - (s.virtual_address as u64 - s.pointer_to_raw_data as u64)) as usize)
 }
 
 #[cfg(test)]
