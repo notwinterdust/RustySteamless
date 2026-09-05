@@ -12,21 +12,36 @@ env:
 
 jobs:
   release:
-    name: Build & Publish Release
+    name: Build ${{ matrix.artifact }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            artifact: rusty-steamless-linux-x86_64
-            binary: rusty-steamless
           - os: windows-latest
-            artifact: rusty-steamless-windows-x86_64.exe
+            target: ""
+            arch: x86_64
+            appimage: false
             binary: rusty-steamless.exe
+            artifact: rusty-steamless-windows-x86.exe
           - os: macos-latest
-            artifact: rusty-steamless-macos-arm64
+            target: ""
+            arch: x86_64
+            appimage: false
             binary: rusty-steamless
+            artifact: rusty-steamless-macos
+          - os: ubuntu-latest
+            target: ""
+            arch: x86_64
+            appimage: true
+            binary: rusty-steamless
+            artifact: rusty-steamless-linux-x86.AppImage
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            arch: aarch64
+            appimage: true
+            binary: rusty-steamless
+            artifact: rusty-steamless-linux-arm64.AppImage
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -35,6 +50,16 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
+          target: ${{ matrix.target }}
+
+      - name: Install ARM64 Cross Linker
+        if: matrix.arch == 'aarch64'
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Configure ARM64 Cross Linker
+        if: matrix.arch == 'aarch64'
+        shell: bash
+        run: echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
 
       - name: Read Version from Cargo.toml
         id: version
@@ -48,12 +73,77 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Build Release Binary
-        run: cargo build --release --bin rusty-steamless
+        shell: bash
+        run: cargo build --release $([ -n "${{ matrix.target }}" ] && echo "--target ${{ matrix.target }}") --bin rusty-steamless
 
-      - name: Locate Binary
+      - name: Package Linux AppImage
+        if: matrix.appimage
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${{ matrix.target }}" ]; then
+            BIN="target/${{ matrix.target }}/release/rusty-steamless"
+          else
+            BIN="target/release/rusty-steamless"
+          fi
+
+          mkdir -p AppDir/usr/bin
+          cp "$BIN" AppDir/usr/bin/rusty-steamless
+
+          cat > AppDir/AppRun <<'EOF'
+          #!/bin/sh
+          SELF=$(readlink -f "$0")
+          HERE=${SELF%/*}
+          exec "$HERE/usr/bin/rusty-steamless" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+
+          cat > AppDir/rusty-steamless.desktop <<'EOF'
+          [Desktop Entry]
+          Name=Rusty-Steamless
+          Comment=Cross-platform SteamStub DRM remover CLI
+          Exec=rusty-steamless
+          Type=Application
+          Categories=Utility;
+          Terminal=true
+          EOF
+
+          python3 - <<'PY'
+          import struct, zlib
+
+          def chunk(t, d):
+              c = struct.pack('>I', len(d)) + t + d
+              return c + struct.pack('>I', zlib.crc32(t + d) & 0xFFFFFFFF)
+
+          w = h = 64
+          rows = []
+          for y in range(h):
+              rows.append(b'\x00')
+              for x in range(w):
+                  rows[-1] += b'\xee\xee\xee' if (x // 8 + y // 8) % 2 else b'\x11\x11\x11'
+          raw = b''.join(rows)
+          png = (b'\x89PNG\r\n\x1a\n'
+                 + chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0))
+                 + chunk(b'IDAT', zlib.compress(raw))
+                 + chunk(b'IEND', b''))
+          with open('AppDir/rusty-steamless.png', 'wb') as f:
+              f.write(png)
+          PY
+
+          curl -sL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+          APPIMAGE_EXTRACT_AND_RUN=1 ARCH=${{ matrix.arch }} ./appimagetool --no-appstream AppDir ${{ matrix.artifact }}
+
+      - name: Stage Release Asset
         id: locate
         shell: bash
-        run: echo "path=target/release/${{ matrix.binary }}" >> "$GITHUB_OUTPUT"
+        run: |
+          if [ "${{ matrix.appimage }}" = "true" ]; then
+            echo "path=${{ github.workspace }}/${{ matrix.artifact }}" >> "$GITHUB_OUTPUT"
+          else
+            cp "target/release/${{ matrix.binary }}" "target/release/${{ matrix.artifact }}"
+            echo "path=${{ github.workspace }}/target/release/${{ matrix.artifact }}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
