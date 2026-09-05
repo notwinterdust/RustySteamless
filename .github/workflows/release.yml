@@ -103,6 +103,7 @@ jobs:
           Name=Rusty-Steamless
           Comment=Cross-platform SteamStub DRM remover CLI
           Exec=rusty-steamless
+          Icon=rusty-steamless
           Type=Application
           Categories=Utility;
           Terminal=true
