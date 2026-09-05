@@ -1,4 +1,4 @@
-//! Rusty-Steamless core library.
+//! RustySteamless core library.
 //!
 //! Cross-platform port of the Steamless C# internals: PE parsing,
 //! crypto helpers, pattern scanning and the SteamStub unpacker variants.

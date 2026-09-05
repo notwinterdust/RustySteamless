@@ -1,4 +1,4 @@
-//! Tauri command layer that wraps the Rusty-Steamless core.
+//! Tauri command layer that wraps the RustySteamless core.
 
 use rusty_core::logger::{Level, Logger};
 use rusty_core::options::Options;

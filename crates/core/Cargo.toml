@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Core library for Rusty-Steamless: SteamStub DRM unpacking."
+description = "Core library for RustySteamless: SteamStub DRM unpacking."
 
 [lib]
 name = "rusty_core"

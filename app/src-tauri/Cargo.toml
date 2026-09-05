@@ -1,7 +1,7 @@
 [package]
 name = "rusty-steamless-app"
 version = "0.0.1"
-description = "Rusty-Steamless Tauri GUI."
+description = "RustySteamless Tauri GUI."
 edition = "2021"
 rust-version = "1.85"
 license = "CC-BY-NC-ND-4.0"
