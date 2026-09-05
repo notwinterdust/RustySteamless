@@ -12,54 +12,59 @@ env:
 
 jobs:
   release:
-    name: Build ${{ matrix.artifact }}
+    name: Build ${{ matrix.job-name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: windows-latest
+          - job-name: Windows x86 GUI + CLI
+            os: windows-latest
             target: ""
-            arch: x86_64
-            appimage: false
-            binary: rusty-steamless.exe
-            artifact: rusty-steamless-windows-x86.exe
-          - os: macos-latest
+            gui: true
+            apt-gui: false
+            cross-linker: false
+            cli-binary: rusty-steamless.exe
+            cli-asset: rusty-steamless-cli-windows-x86.exe
+            gui-asset: rusty-steamless-windows-x86.exe
+            gui-glob: app/src-tauri/target/release/bundle/nsis/*-setup.exe
+            bundles: nsis
+          - job-name: macOS arm64 GUI + CLI
+            os: macos-latest
             target: ""
-            arch: x86_64
-            appimage: false
-            binary: rusty-steamless
-            artifact: rusty-steamless-macos
-          - os: ubuntu-latest
+            gui: true
+            apt-gui: false
+            cross-linker: false
+            cli-binary: rusty-steamless
+            cli-asset: rusty-steamless-cli-macos-arm64
+            gui-asset: rusty-steamless-macos-arm64.dmg
+            gui-glob: app/src-tauri/target/release/bundle/dmg/*.dmg
+            bundles: dmg
+          - job-name: Linux x86 GUI + CLI
+            os: ubuntu-latest
             target: ""
-            arch: x86_64
-            appimage: true
-            binary: rusty-steamless
-            artifact: rusty-steamless-linux-x86.AppImage
-          - os: ubuntu-latest
+            gui: true
+            apt-gui: true
+            cross-linker: false
+            cli-binary: rusty-steamless
+            cli-asset: rusty-steamless-cli-linux-x86
+            gui-asset: rusty-steamless-linux-x86.AppImage
+            gui-glob: app/src-tauri/target/release/bundle/appimage/*.AppImage
+            bundles: appimage
+          - job-name: Linux arm64 CLI
+            os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            arch: aarch64
-            appimage: true
-            binary: rusty-steamless
-            artifact: rusty-steamless-linux-arm64.AppImage
+            gui: false
+            apt-gui: false
+            cross-linker: true
+            cli-binary: rusty-steamless
+            cli-asset: rusty-steamless-cli-linux-arm64
+            gui-asset: ""
+            gui-glob: ""
+            bundles: ""
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Install Rust Toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: stable
-          target: ${{ matrix.target }}
-
-      - name: Install ARM64 Cross Linker
-        if: matrix.arch == 'aarch64'
-        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
-
-      - name: Configure ARM64 Cross Linker
-        if: matrix.arch == 'aarch64'
-        shell: bash
-        run: echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
 
       - name: Read Version from Cargo.toml
         id: version
@@ -69,84 +74,73 @@ jobs:
           echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
+      - name: Install Node.js
+        if: matrix.gui
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Rust Toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+
+      - name: Install Linux GUI Build Dependencies
+        if: matrix.apt-gui
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libfuse2t64
+
+      - name: Install ARM64 Cross Linker
+        if: matrix.cross-linker
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Configure ARM64 Cross Linker
+        if: matrix.cross-linker
+        shell: bash
+        run: echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
+
       - name: Smart Cargo Cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Build Release Binary
+      - name: Build CLI Binary
         shell: bash
         run: cargo build --release $([ -n "${{ matrix.target }}" ] && echo "--target ${{ matrix.target }}") --bin rusty-steamless
 
-      - name: Package Linux AppImage
-        if: matrix.appimage
+      - name: Install Frontend Dependencies
+        if: matrix.gui
+        working-directory: app
+        run: npm ci
+
+      - name: Build GUI Bundles
+        if: matrix.gui
+        working-directory: app
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: npx tauri build --bundles ${{ matrix.bundles }}
+
+      - name: Stage Release Assets
+        id: stage
         shell: bash
         run: |
-          set -euo pipefail
-          if [ -n "${{ matrix.target }}" ]; then
-            BIN="target/${{ matrix.target }}/release/rusty-steamless"
-          else
-            BIN="target/release/rusty-steamless"
-          fi
+          {
+            echo "assets<<EOF"
+            CLI_PATH="target/release/${{ matrix.cli-binary }}"
+            if [ -n "${{ matrix.target }}" ]; then
+              CLI_PATH="target/${{ matrix.target }}/release/${{ matrix.cli-binary }}"
+            fi
+            cp "$CLI_PATH" "${{ matrix.cli-asset }}"
+            echo "$GITHUB_WORKSPACE/${{ matrix.cli-asset }}"
+            if [ "${{ matrix.gui }}" = "true" ]; then
+              GUI_FILE=$(ls ${{ matrix.gui-glob }} | head -n 1)
+              cp "$GUI_FILE" "${{ matrix.gui-asset }}"
+              echo "$GITHUB_WORKSPACE/${{ matrix.gui-asset }}"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
-          mkdir -p AppDir/usr/bin
-          cp "$BIN" AppDir/usr/bin/rusty-steamless
-
-          cat > AppDir/AppRun <<'EOF'
-          #!/bin/sh
-          SELF=$(readlink -f "$0")
-          HERE=${SELF%/*}
-          exec "$HERE/usr/bin/rusty-steamless" "$@"
-          EOF
-          chmod +x AppDir/AppRun
-
-          cat > AppDir/rusty-steamless.desktop <<'EOF'
-          [Desktop Entry]
-          Name=Rusty-Steamless
-          Comment=Cross-platform SteamStub DRM remover CLI
-          Exec=rusty-steamless
-          Icon=rusty-steamless
-          Type=Application
-          Categories=Utility;
-          Terminal=true
-          EOF
-
-          python3 - <<'PY'
-          import struct, zlib
-
-          def chunk(t, d):
-              c = struct.pack('>I', len(d)) + t + d
-              return c + struct.pack('>I', zlib.crc32(t + d) & 0xFFFFFFFF)
-
-          w = h = 64
-          rows = []
-          for y in range(h):
-              rows.append(b'\x00')
-              for x in range(w):
-                  rows[-1] += b'\xee\xee\xee' if (x // 8 + y // 8) % 2 else b'\x11\x11\x11'
-          raw = b''.join(rows)
-          png = (b'\x89PNG\r\n\x1a\n'
-                 + chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0))
-                 + chunk(b'IDAT', zlib.compress(raw))
-                 + chunk(b'IEND', b''))
-          with open('AppDir/rusty-steamless.png', 'wb') as f:
-              f.write(png)
-          PY
-
-          curl -sL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x appimagetool
-          APPIMAGE_EXTRACT_AND_RUN=1 ARCH=${{ matrix.arch }} ./appimagetool --no-appstream AppDir ${{ matrix.artifact }}
-
-      - name: Stage Release Asset
-        id: locate
-        shell: bash
-        run: |
-          if [ "${{ matrix.appimage }}" = "true" ]; then
-            echo "path=${{ github.workspace }}/${{ matrix.artifact }}" >> "$GITHUB_OUTPUT"
-          else
-            cp "target/release/${{ matrix.binary }}" "target/release/${{ matrix.artifact }}"
-            echo "path=${{ github.workspace }}/target/release/${{ matrix.artifact }}" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Upload Release Asset
+      - name: Upload Release Assets
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
@@ -154,7 +148,7 @@ jobs:
           body: |
             Rusty-Steamless v${{ steps.version.outputs.version }}
 
-            Cross-platform SteamStub DRM remover CLI.
-          files: ${{ steps.locate.outputs.path }}
+            SteamStub DRM remover with a Tauri GUI and a cross-platform CLI.
+          files: ${{ steps.stage.outputs.assets }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
