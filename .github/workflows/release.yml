@@ -38,6 +38,7 @@ jobs:
 
       - name: Read Version from Cargo.toml
         id: version
+        shell: bash
         run: |
           VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)
           echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
