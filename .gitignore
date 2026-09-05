@@ -13,3 +13,10 @@ rustc-ice-*.txt
 *.pdb
 .gitignore
 tasks_to_follow.md
+
+# Node / Vite frontend artifacts
+node_modules/
+app/dist/
+app/src-tauri/target/
+app/src-tauri/gen/
+app/src-tauri/.vite/
