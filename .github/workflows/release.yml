@@ -1,0 +1,154 @@
+name: Release
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    name: Build ${{ matrix.job-name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - job-name: Windows x86 GUI + CLI
+            os: windows-latest
+            target: ""
+            gui: true
+            apt-gui: false
+            cross-linker: false
+            cli-binary: rusty-steamless.exe
+            cli-asset: rusty-steamless-cli-windows-x86.exe
+            gui-asset: rusty-steamless-windows-x86.exe
+            gui-glob: app/src-tauri/target/release/bundle/nsis/*-setup.exe
+            bundles: nsis
+          - job-name: macOS arm64 GUI + CLI
+            os: macos-latest
+            target: ""
+            gui: true
+            apt-gui: false
+            cross-linker: false
+            cli-binary: rusty-steamless
+            cli-asset: rusty-steamless-cli-macos-arm64
+            gui-asset: rusty-steamless-macos-arm64.dmg
+            gui-glob: app/src-tauri/target/release/bundle/dmg/*.dmg
+            bundles: dmg
+          - job-name: Linux x86 GUI + CLI
+            os: ubuntu-latest
+            target: ""
+            gui: true
+            apt-gui: true
+            cross-linker: false
+            cli-binary: rusty-steamless
+            cli-asset: rusty-steamless-cli-linux-x86
+            gui-asset: rusty-steamless-linux-x86.AppImage
+            gui-glob: app/src-tauri/target/release/bundle/appimage/*.AppImage
+            bundles: appimage
+          - job-name: Linux arm64 CLI
+            os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            gui: false
+            apt-gui: false
+            cross-linker: true
+            cli-binary: rusty-steamless
+            cli-asset: rusty-steamless-cli-linux-arm64
+            gui-asset: ""
+            gui-glob: ""
+            bundles: ""
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read Version from Cargo.toml
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Install Node.js
+        if: matrix.gui
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Rust Toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+
+      - name: Install Linux GUI Build Dependencies
+        if: matrix.apt-gui
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libfuse2t64
+
+      - name: Install ARM64 Cross Linker
+        if: matrix.cross-linker
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Configure ARM64 Cross Linker
+        if: matrix.cross-linker
+        shell: bash
+        run: echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
+
+      - name: Smart Cargo Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build CLI Binary
+        shell: bash
+        run: cargo build --release $([ -n "${{ matrix.target }}" ] && echo "--target ${{ matrix.target }}") --bin rusty-steamless
+
+      - name: Install Frontend Dependencies
+        if: matrix.gui
+        working-directory: app
+        run: npm ci
+
+      - name: Build GUI Bundles
+        if: matrix.gui
+        working-directory: app
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: npx tauri build --bundles ${{ matrix.bundles }}
+
+      - name: Stage Release Assets
+        id: stage
+        shell: bash
+        run: |
+          {
+            echo "assets<<EOF"
+            CLI_PATH="target/release/${{ matrix.cli-binary }}"
+            if [ -n "${{ matrix.target }}" ]; then
+              CLI_PATH="target/${{ matrix.target }}/release/${{ matrix.cli-binary }}"
+            fi
+            cp "$CLI_PATH" "${{ matrix.cli-asset }}"
+            echo "$GITHUB_WORKSPACE/${{ matrix.cli-asset }}"
+            if [ "${{ matrix.gui }}" = "true" ]; then
+              GUI_FILE=$(ls ${{ matrix.gui-glob }} | head -n 1)
+              cp "$GUI_FILE" "${{ matrix.gui-asset }}"
+              echo "$GITHUB_WORKSPACE/${{ matrix.gui-asset }}"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          body: |
+            Rusty-Steamless v${{ steps.version.outputs.version }}
+
+            SteamStub DRM remover with a Tauri GUI and a cross-platform CLI.
+          files: ${{ steps.stage.outputs.assets }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

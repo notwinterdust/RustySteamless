@@ -4,7 +4,7 @@ members = ["crates/core", "crates/cli"]
 exclude = ["app/src-tauri"]
 
 [workspace.package]
-version = "0.0.1"
+version = "0.1.0"
 edition = "2021"
 rust-version = "1.85"
 license = "CC-BY-NC-ND-4.0"
