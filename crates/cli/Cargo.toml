@@ -1,0 +1,17 @@
+[package]
+name = "rusty-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Cross-platform SteamStub DRM remover CLI."
+
+[[bin]]
+name = "rusty-steamless"
+path = "src/main.rs"
+
+[dependencies]
+rusty-core = { path = "../core" }
+clap.workspace = true
+anyhow.workspace = true

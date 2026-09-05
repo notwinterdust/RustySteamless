@@ -1,0 +1,148 @@
+:root {
+  color-scheme: dark;
+  --bg: #000000;
+  --panel: #141414;
+  --border: #333333;
+  --text: #ffffff;
+  --muted: #888888;
+  --accent: #ffffff;
+  --accent-text: #000000;
+  --success: #ffffff;
+  --error: #ffffff;
+  --debug: #666666;
+  --info: #bbbbbb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.4rem;
+  letter-spacing: 0.02em;
+}
+
+.subtitle {
+  margin: 0.15rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  padding: 1rem;
+}
+
+.card h2 {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+button {
+  background: var(--accent);
+  color: var(--accent-text);
+  border: 1px solid var(--accent);
+  border-radius: 0;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+#actions-card {
+  position: relative;
+  padding: 0;
+  display: flex;
+}
+
+#unpack {
+  width: 100%;
+  height: 3rem;
+  border: none;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+#options-card label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 1rem 0.5rem 0;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-left: 0.75rem;
+}
+
+#status {
+  position: absolute;
+  bottom: 0.5rem;
+  right: 0.75rem;
+  margin: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.drop-hint {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+}
+
+#log-card.dragover {
+  outline: 2px dashed var(--text);
+}
+
+pre#console {
+  height: 9rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.5rem;
+  background: #000000;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  font-family: ui-monospace, "Cascadia Code", monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.log-debug { color: var(--debug); }
+.log-info { color: var(--info); }
+.log-success { color: var(--success); font-weight: 600; }
+.log-error { color: var(--error); font-weight: 700; }
