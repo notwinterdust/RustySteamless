@@ -13,10 +13,10 @@
     "windows": [
       {
         "title": "Rusty-Steamless",
-        "width": 900,
-        "height": 700,
-        "minWidth": 640,
-        "minHeight": 480,
+        "width": 1100,
+        "height": 560,
+        "minWidth": 720,
+        "minHeight": 420,
         "resizable": true
       }
     ],
