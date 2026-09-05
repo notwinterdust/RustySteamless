@@ -21,19 +21,17 @@
 
       <section class="card" id="options-card">
         <h2>Options</h2>
-        <label><input type="checkbox" id="opt-verbose" checked /> Verbose output</label>
-        <label><input type="checkbox" id="opt-keepbind" /> Keep .bind section</label>
-        <label><input type="checkbox" id="opt-keepstub" /> Keep DOS stub data</label>
-        <label><input type="checkbox" id="opt-dumppayload" /> Dump payload</label>
-        <label><input type="checkbox" id="opt-dumpdrmp" /> Dump SteamDRMP.dll</label>
-        <label><input type="checkbox" id="opt-realign" /> Re-align sections</label>
-        <label><input type="checkbox" id="opt-checksum" /> Recalculate checksum</label>
-        <label><input type="checkbox" id="opt-exp" /> Experimental features</label>
+        <label><input type="checkbox" id="opt-keepbind" /> Keep Bind Section</label>
+        <label><input type="checkbox" id="opt-dumppayload" /> Dump Payload To Disk</label>
+        <label><input type="checkbox" id="opt-dumpdrmp" /> Dump SteamDRMP.dll To Disk</label>
+        <label><input type="checkbox" id="opt-checksum" /> Recalculate File Checksum</label>
+        <label><input type="checkbox" id="opt-zerodos" checked /> Zero Dos Stub Data</label>
+        <label><input type="checkbox" id="opt-realign" checked /> Don't Re-align Sections</label>
+        <label><input type="checkbox" id="opt-exp" /> Use Experimental Features</label>
       </section>
 
       <section class="card" id="actions-card">
         <button id="unpack" type="button" disabled>Unpack</button>
-        <span id="dispatch" class="muted"></span>
         <span id="status" class="muted"></span>
       </section>
 

@@ -1,14 +1,16 @@
 :root {
   color-scheme: dark;
-  --bg: #14181c;
-  --panel: #1d2329;
-  --border: #2c353d;
-  --text: #dce3ea;
-  --muted: #8b96a3;
-  --accent: #4f9cf9;
-  --success: #51cf66;
-  --error: #ff6b6b;
-  --debug: #74818e;
+  --bg: #000000;
+  --panel: #141414;
+  --border: #333333;
+  --text: #ffffff;
+  --muted: #888888;
+  --accent: #ffffff;
+  --accent-text: #000000;
+  --success: #ffffff;
+  --error: #ffffff;
+  --debug: #666666;
+  --info: #bbbbbb;
 }
 
 * {
@@ -34,6 +36,7 @@ main {
 header h1 {
   margin: 0;
   font-size: 1.4rem;
+  letter-spacing: 0.02em;
 }
 
 .subtitle {
@@ -45,7 +48,7 @@ header h1 {
 .card {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 0;
   padding: 1rem;
 }
 
@@ -53,22 +56,23 @@ header h1 {
   margin: 0 0 0.75rem;
   font-size: 0.95rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   color: var(--muted);
 }
 
 button {
   background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: 6px;
+  color: var(--accent-text);
+  border: 1px solid var(--accent);
+  border-radius: 0;
   padding: 0.5rem 1rem;
   font-size: 0.9rem;
+  font-weight: 600;
   cursor: pointer;
 }
 
 button:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
@@ -95,7 +99,7 @@ button:disabled {
 }
 
 #log-card.dragover {
-  outline: 2px dashed var(--accent);
+  outline: 2px dashed var(--text);
 }
 
 pre#console {
@@ -103,8 +107,9 @@ pre#console {
   overflow-y: auto;
   margin: 0;
   padding: 0.5rem;
-  background: #0f1215;
-  border-radius: 6px;
+  background: #000000;
+  border: 1px solid var(--border);
+  border-radius: 0;
   font-family: ui-monospace, "Cascadia Code", monospace;
   font-size: 0.8rem;
   line-height: 1.5;
@@ -113,6 +118,6 @@ pre#console {
 }
 
 .log-debug { color: var(--debug); }
-.log-info { color: var(--text); }
-.log-success { color: var(--success); }
-.log-error { color: var(--error); }
+.log-info { color: var(--info); }
+.log-success { color: var(--success); font-weight: 600; }
+.log-error { color: var(--error); font-weight: 700; }

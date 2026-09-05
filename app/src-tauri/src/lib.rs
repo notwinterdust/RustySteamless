@@ -45,15 +45,6 @@ struct UnpackReport {
     used_variant: Option<String>,
 }
 
-/// Lists the SteamStub variants known to the core, in dispatch order.
-#[tauri::command]
-fn list_variants() -> Vec<String> {
-    unpackers()
-        .iter()
-        .map(|unpacker| unpacker.name().to_string())
-        .collect()
-}
-
 /// Unpack `path` with the given options, streaming log lines to the `log`
 /// event as the work progresses.
 #[tauri::command]
@@ -111,7 +102,7 @@ fn unpack(app: AppHandle, path: String, options: Options) -> Result<UnpackReport
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![list_variants, unpack])
+        .invoke_handler(tauri::generate_handler![unpack])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
